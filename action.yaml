@@ -1,0 +1,195 @@
+name: '.NET Continuous Deployment'
+description: 'Build, test, and publish .NET libraries to NuGet'
+branding:
+  icon: 'settings'
+  color: 'green'
+inputs:
+  dotnet-version:
+    description: 'The .NET SDK version to use'
+    required: false
+    default: '6.0'
+  build-configuration:
+    description: 'Configuration to use for building the project'
+    required: false
+    default: 'Release'
+  test-verbosity:
+    description: 'Set the verbosity of test results'
+    required: false
+    default: 'normal'
+  additional-build-arguments:
+    description: 'Extra arguments to pass to dotnet build'
+    required: false
+    default: ''
+  additional-test-arguments:
+    description: 'Extra arguments to pass to dotnet test'
+    required: false
+    default: ''
+  package-id:
+    description: 'ID of the NuGet package to create'
+    required: true
+  version-bump:
+    description: 'Version bump type for the release (major, minor, patch)'
+    required: false
+    default: 'minor'
+  author: 
+    description: 'Author of the repository'
+    required: false
+    default: 'Your Name'
+  package-tags:
+    description: 'Comma-separated list of tags to apply to the NuGet package'
+    required: false
+    default: ''
+  repository-url:
+    description: 'URL of the repository for the NuGet package'
+    required: false
+    default: ''
+  license:
+    description: 'License for the NuGet package'
+    required: true
+  implicit-usings:
+    description: 'Enable implicit usings in the project'
+    required: false
+    default: 'disable'
+  nullable:
+    description: 'Enable nullable reference types in the project'
+    required: false
+    default: 'enable'
+  package-readme-file:
+    description: 'Path to the README file to use as the package description'
+    required: false
+    default: 'README.md'
+  project-file-location:
+    description: 'Location of the .csproj file to build and pack'
+    required: false
+    default: ''
+  version-prefix:
+    description: 'Prefix to use for the version number'
+    required: false
+    default: 'v'
+runs:
+  using: 'composite'
+  steps:
+    - name: Check required inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.license }}" ]; then
+          echo "::error::Error: license is required."
+          exit 1
+        fi
+
+    - name: Run .NET CI Action
+      uses: jmsudar/dotnet-continuous-integration@main
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+        build-configuration: ${{ inputs.build-configuration }}
+        test-verbosity: ${{ inputs.test-verbosity }}
+        additional-build-arguments: ${{ inputs.additional-build-arguments }}
+        additional-test-arguments: ${{ inputs.additional-test-arguments }}
+
+    - name: Extract Repository name
+      shell: bash
+      run: |
+        repo_name=$(basename ${{ github.repository }})
+        echo "REPO_NAME=$repo_name" >> $GITHUB_ENV
+
+    - name: Set file location
+      shell: bash
+      id: set_file_location
+      env:
+        PROJECT_FILE_LOCATION: ${{ inputs.project-file-location }}
+      run: |
+        DEFAULT_LOCATION="src/${{ env.REPO_NAME }}/${{ env.REPO_NAME }}.csproj"
+        if [ -z "${{ inputs.project-file-location }}" ]; then
+          echo "No project file location specified, using default."
+          echo "project_file=$DEFAULT_LOCATION" >> $GITHUB_OUTPUT
+        else
+          echo "Project file location: ${{ env.PROJECT_FILE_LOCATION }}"
+          echo "project_file=${{ env.PROJECT_FILE_LOCATION }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Calculate next version
+      id: calculate_version
+      uses: anothrNick/github-tag-action@1.67.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        default_bump: ${{ inputs.version-bump }}
+        release_branches: main
+        # Default to not using the version prefix as it will break the project file
+        with_v: false
+        dry_run: true
+    
+    - name: NuGet Pack
+      shell: bash
+      env:
+        BUILD_CONFIGURATION: ${{ inputs.build-configuration }}
+        PROJECT_FILE: ${{ steps.set_file_location.outputs.project_file }}
+      run: |
+        dotnet pack "${{ env.PROJECT_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }}
+
+    - name: NuGet publish
+      shell: bash
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        PACKAGE_ID: ${{ inputs.package-id }}
+        VERSION: ${{ steps.calculate_version.outputs.new_tag }}
+        BUILD_CONFIGURATION: ${{ inputs.build-configuration }}
+      run: |
+        PROJECT_DIR=$(dirname "${{ steps.set_file_location.outputs.project_file }}")
+        OUTPUT_DIR="$PROJECT_DIR/bin/${{ env.BUILD_CONFIGURATION }}"
+
+        # Construct the expected package path using the actual package ID
+        PACKAGE_FILE="$OUTPUT_DIR/${{ env.PACKAGE_ID }}.${{ env.VERSION }}.nupkg"
+        
+        echo "Expected package: $PACKAGE_FILE"
+
+        if [[ ! -f "$PACKAGE_FILE" ]]; then
+          echo "::error::Error: Package file not found at expected path: $PACKAGE_FILE"
+          echo "This could indicate a mismatch between the package ID and the actual generated package."
+          exit 1
+        fi        
+
+        dotnet nuget push "$PACKAGE_FILE" \
+          --api-key "${{ secrets.NUGET_API_KEY }}" \
+          --source https://api.nuget.org/v3/index.json
+
+    - name: Commit updated .csproj file
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.calculate_version.outputs.new_tag }}
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'github-actions@github.com'
+        git add '${{ steps.set_file_location.outputs.project_file }}'
+        
+        # Different commit message based on whether we're updating version
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          git commit -m "Update version to v${{ env.VERSION }} [skip cd]"
+        else
+          git commit -m "Update package metadata [skip cd]"
+        fi
+        
+        git push
+    
+    - name: Generate Changelog
+      id: changelog
+      uses: mikepenz/release-changelog-builder-action@v4.2.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Bump Version
+      id: bump_version
+      uses: anothrNick/github-tag-action@1.67.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DEFAULT_BUMP: minor
+        RELEASE_BRANCHES: main
+        WITH_V: true
+
+    - name: Create Release
+      uses: ncipollo/release-action@v1.14.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: Release ${{ steps.bump_version.outputs.new_tag }}
+        tag: ${{ steps.bump_version.outputs.new_tag }}
+        body: ${{ steps.changelog.outputs.changelog }}
