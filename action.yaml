@@ -123,6 +123,22 @@ runs:
         with_v: false
         dry_run: true
     
+    - name: Update .csproj File
+      uses: jmsudar/dotnet-update-csproj-file-@main
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        file-path: ${{ steps.set_file_location.outputs.project_file }}
+        package-id: ${{ inputs.package-id }}
+        version: ${{ steps.calculate_version.outputs.new_tag }}
+        author: ${{ inputs.author }}
+        package-tags: ${{ inputs.package-tags }}
+        repository-url: ${{ inputs.repository-url }}
+        license: ${{ inputs.license }}
+        target-framework: 'net${{ inputs.dotnet-version }}'
+        implicit-usings: ${{ inputs.implicit-usings }}
+        nullable: ${{ inputs.nullable }}
+        package-readme-file: ${{ inputs.package-readme-file }}
+
     - name: NuGet Pack
       shell: bash
       env:
