@@ -124,7 +124,7 @@ runs:
         dry_run: true
     
     - name: Update .csproj File
-      uses: jmsudar/dotnet-update-csproj-file-@main
+      uses: jmsudar/dotnet-update-csproj-file-@jms-initial-commit
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         file-path: ${{ steps.set_file_location.outputs.project_file }}
