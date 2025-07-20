@@ -17,6 +17,7 @@ This GitHub Action is designed to provide a simple and effective way to build, t
 | `dotnet-version`           | The .NET SDK version to use.                         | No       | `6.0`    |
 | `build-configuration`      | Configuration to use for building the project.       | No       | `Release`|
 | `test-verbosity`           | Set the verbosity of test results.                   | No       | `normal` |
+| `solution-path`             | The path to the solution file                       | No       | `'.'` |
 | `additional-build-arguments`| Any additional arguments to include with your build command | No | `''` |
 | `additional-test-arguments`| Any additional arguments to include with your test command | No | `''` |
 | `package-id`               | ID of the NuGet package to create.                   | Yes      | N/A      |

@@ -16,6 +16,10 @@ inputs:
     description: 'Set the verbosity of test results'
     required: false
     default: 'normal'
+  solution-path:
+    description: 'Path to the project or solution file'
+    required: false
+    default: '.'    
   additional-build-arguments:
     description: 'Extra arguments to pass to dotnet build'
     required: false
@@ -83,6 +87,7 @@ runs:
         dotnet-version: ${{ inputs.dotnet-version }}
         build-configuration: ${{ inputs.build-configuration }}
         test-verbosity: ${{ inputs.test-verbosity }}
+        solution-path: ${{ inputs.solution-path }}
         additional-build-arguments: ${{ inputs.additional-build-arguments }}
         additional-test-arguments: ${{ inputs.additional-test-arguments }}
 
