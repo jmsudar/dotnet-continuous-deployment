@@ -4,6 +4,10 @@ branding:
   icon: 'settings'
   color: 'green'
 inputs:
+  nuget-api-key:
+    description: 'NuGet API key for publishing packages'
+    required: true
+    default: ''
   dotnet-version:
     description: 'The .NET SDK version to use'
     required: false
@@ -84,6 +88,7 @@ runs:
     - name: Run .NET CI Action
       uses: jmsudar/dotnet-continuous-integration@main
       with:
+        nuget-api-key: ${{ inputs.nuget-api-key }}
         dotnet-version: ${{ inputs.dotnet-version }}
         build-configuration: ${{ inputs.build-configuration }}
         test-verbosity: ${{ inputs.test-verbosity }}

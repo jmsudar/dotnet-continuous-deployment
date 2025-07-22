@@ -14,6 +14,7 @@ This GitHub Action is designed to provide a simple and effective way to build, t
 
 | Input                      | Description                                          | Required | Default  |
 |----------------------------|------------------------------------------------------|----------|----------|
+| `nuget-api-key` | The NuGet key set in your repo | Yes | `''` |
 | `dotnet-version`           | The .NET SDK version to use.                         | No       | `6.0`    |
 | `build-configuration`      | Configuration to use for building the project.       | No       | `Release`|
 | `test-verbosity`           | Set the verbosity of test results.                   | No       | `normal` |
@@ -71,6 +72,7 @@ jobs:
       - name: Run .NET CI Action
         uses: jmsudar/dotnet-continuous-deployment@jms-integrate-test-repo
         with: 
+          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
           package-id: '${{ github.repository_owner }}.${{ github.event.repository.name }}'
           author: ${{ github.repository_owner }}
           repository-url: 'git@github.com:${{ github.repository }}.git'
